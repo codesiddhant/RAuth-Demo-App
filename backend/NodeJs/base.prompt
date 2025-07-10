@@ -1,0 +1,195 @@
+@https://www.npmjs.com/package/rauth-provider 
+
+use library and test it make 
+simple express backend to check all functioanlly of this library 
+
+RauthProvider
+A lightweight, plug-and-play Node.js library for phone number authentication using the Rauth.io reverse verification flow via WhatsApp or SMS. It handles everything from session creation to revocation — with real-time webhook updates and Express.js support, all with minimal setup.
+
+✅ Features
+📲 Reverse Authentication – Authenticate users via WhatsApp or SMS without sending OTPs
+
+🔐 Session Management – Track sessions, verify tokens, and revoke access automatically
+
+📡 Webhook Support – Listen for number verification and session revocation in real-time
+
+🧩 Plug-and-Play API – Simple, developer-friendly API surface
+
+⚡ Express Middleware – Drop-in Express.js integration
+
+🛡️ Secure by Design – Signature-based verification and session validation
+
+🧠 Smart Caching – In-memory session tracking with fallback to API
+
+🔗 Rauth API Ready – Built to connect seamlessly with the Rauth.io platform
+
+🟪 TypeScript Native – Full TypeScript typings included for modern development
+
+Installation
+npm install rauth-provider
+Quick Start
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const { RauthProvider } = require('rauth-provider');
+
+const app = express();
+
+// Initialize RauthProvider
+RauthProvider.init({
+  rauth_api_key: process.env.RAUTH_API_KEY,
+  app_id: process.env.RAUTH_APP_ID,
+  webhook_secret: process.env.RAUTH_WEBHOOK_SECRET,
+  webhook_url: process.env.RAUTH_WEBHOOK_URL,
+});
+
+// Webhook endpoint (handles session_created and session_revoked events)
+app.post('/rauth/webhook', RauthProvider.webhookHandler());
+
+// Session initialization (calls rauth.io API)
+app.post('/api/login/init', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    const initResult = await RauthProvider.initSession(phone, req.headers);
+    // Forward the response to client with verification links
+    res.json({ ...initResult });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Session verification
+app.post('/api/login', async (req, res) => {
+  try {
+    const { sessionToken, userPhone } = req.body;
+    const isVerified = await RauthProvider.verifySession(sessionToken, userPhone);
+    if (!isVerified) {
+      return res.status(401).json({ error: 'Phone number not verified' });
+    }
+    const jwtToken = jwt.sign({ userPhone, sessionToken }, process.env.JWT_SECRET);
+    res.json({ jwtToken });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Protected route
+app.get('/api/protected', async (req, res) => {
+  try {
+    const jwtToken = req.headers.authorization?.replace('Bearer ', '');
+    const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET);
+    const isRevoked = await RauthProvider.isSessionRevoked(decoded.sessionToken);
+    if (isRevoked) {
+      return res.status(401).json({ error: 'Session revoked. Please log in again.' });
+    }
+    res.json({ message: 'Protected route accessed', user: decoded.userPhone });
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+API Reference
+RauthProvider.init(options)
+Initialize the RauthProvider with configuration options.
+
+RauthProvider.init({
+  rauth_api_key: 'your-api-key',
+  app_id: 'your-app-id',
+  webhook_secret: 'your-webhook-secret',
+  webhook_url: 'https://your-app.com/webhook',
+  default_session_ttl: 900, // 15 minutes (optional)
+  default_revoked_ttl: 3600, // 1 hour (optional)
+});
+RauthProvider.initSession(phone, headers)
+Initialize a verification session for a phone number (calls rauth.io API).
+
+try {
+  const initResult = await RauthProvider.initSession(
+    '+1234567890',
+    req.headers
+  );
+  // Returns API response:
+  // {
+  //   session_token: 'api-generated-token',
+  //   wa_link: 'https://wa.me/918888888888?text=fhad-dfsfd-eqwt-l4dt-lueb',
+  //   qr_image_link: 'https://cdn.rauth.io/qr/15523456.png'
+  // }
+  
+  // Forward this response to the client so they can verify their phone via WhatsApp
+} catch (error) {
+  console.error('Failed to initialize session:', error.message);
+}
+RauthProvider.verifySession(sessionToken, userPhone)
+Verify if a session is valid and matches the phone number.
+
+const isValid = await RauthProvider.verifySession('session-token', '+1234567890');
+// Returns: Promise<boolean>
+RauthProvider.isSessionRevoked(sessionToken)
+Check if a session has been revoked.
+
+const isRevoked = await RauthProvider.isSessionRevoked('session-token');
+// Returns: Promise<boolean>
+RauthProvider.checkApiHealth()
+Check if the rauth.io API is reachable.
+
+const isHealthy = await RauthProvider.checkApiHealth();
+// Returns: Promise<boolean>
+RauthProvider.webhookHandler()
+Returns Express middleware to handle webhook events.
+
+app.post('/rauth/webhook', RauthProvider.webhookHandler());
+Environment Variables
+Create a .env file with the following variables:
+
+RAUTH_API_KEY=your-rauth-api-key
+RAUTH_APP_ID=your-app-id
+RAUTH_WEBHOOK_SECRET=your-webhook-secret
+RAUTH_WEBHOOK_URL=https://your-app.com/rauth/webhook
+JWT_SECRET=your-jwt-secret
+Error Handling
+The library provides detailed error messages:
+
+try {
+  RauthProvider.init({
+    // missing required fields
+  });
+} catch (error) {
+  console.error(error.message);
+  // "RauthProvider.init(): Missing required fields: rauth_api_key, app_id, webhook_secret"
+}
+TypeScript Support
+The library includes full TypeScript definitions:
+
+import { RauthProvider, RauthProviderConfig, SessionOptions } from 'rauth-provider';
+
+const config: RauthProviderConfig = {
+  rauth_api_key: process.env.RAUTH_API_KEY!,
+  app_id: process.env.RAUTH_APP_ID!,
+  webhook_secret: process.env.RAUTH_WEBHOOK_SECRET!,
+  webhook_url: process.env.RAUTH_WEBHOOK_URL,
+};
+
+RauthProvider.init(config);
+
+const sessionOptions: SessionOptions = RauthProvider.initSession(
+  '+1234567890',
+  req.headers
+);
+Security Considerations
+Webhook Secret: Always use a strong, random webhook secret
+HTTPS: Use HTTPS for webhook endpoints in production
+Rate Limiting: Implement rate limiting on your endpoints
+Token Validation: Always validate session tokens before trusting them
+Environment Variables: Store sensitive config in environment variables
+
+
+
+@/backend 
+use this creds
+RAUTH_API_KEY=ra_test_key_0a2ca49c-d9de-4806-8bd3-2c5fd6f477fb
+RAUTH_APP_ID=4ee3575a-7176-495f-bc49-b84de37c1fde
+RAUTH_WEBHOOK_SECRET=hfsuhyfsh
+RAUTH_WEBHOOK_URL=https://example/rauth/webhook
+JWT_SECRET=your-jwt-secret
