@@ -11,7 +11,6 @@ RauthProvider.init({
   rauth_api_key: process.env.RAUTH_API_KEY,
   app_id: process.env.RAUTH_APP_ID,
   webhook_secret: process.env.RAUTH_WEBHOOK_SECRET,
-  webhook_url: process.env.RAUTH_WEBHOOK_URL,
 });
 
 // Webhook endpoint
@@ -69,6 +68,11 @@ app.get('/api/rauth/health', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-}); 
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+// Vercel serverless handler export
+module.exports = (req, res) => app(req, res); 
