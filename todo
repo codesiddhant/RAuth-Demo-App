@@ -1,2 +1,3 @@
-check webhooks from rauth server
-check weather revoke is working
+check webhooks from rauth server ☑️
+check weather revoke is working ☑️
+extract right device info from header and pass to rauth server
